@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+// frontend/src/App.js (Versión Fase 6 - Tiempo Real)
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 import PhDiagram from './PhDiagram';
+import useDebounce from './useDebounce'; // Importamos nuestro hook
+import ParameterSlider from './ParameterSlider'; // Importamos nuestro slider
 
 function App() {
   const [inputs, setInputs] = useState({
@@ -16,35 +19,43 @@ function App() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleInputChange = (event) => {
-    setInputs({
-      ...inputs,
-      [event.target.name]: event.target.value,
-    });
+  // Usamos nuestro hook para "retrasar" la actualización de los inputs
+  // La API solo se llamará con este valor debounced
+  const debouncedInputs = useDebounce(inputs, 300); // 300ms de retraso
+
+  // Esta función se ejecutará CADA VEZ que el valor DEBOUNCED cambie
+  useEffect(() => {
+    const calculate = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await axios.post('http://127.0.0.1:5000/calculate', debouncedInputs);
+        setResults(response.data);
+      } catch (err) {
+        setError('Error al calcular.');
+        console.error(err);
+      }
+      setLoading(false);
+    };
+
+    calculate();
+  }, [debouncedInputs]); // La dependencia es el valor debounced
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setInputs(prevInputs => ({
+      ...prevInputs,
+      [name]: parseFloat(value) // Convertimos el valor del slider a número
+    }));
+  };
+
+  const handleSelectChange = (e) => {
+    setInputs(prevInputs => ({
+      ...prevInputs,
+      refrigerant: e.target.value
+    }));
   };
   
-  const handleCompEffChange = (event) => {
-    const value = event.target.value;
-    if (!isNaN(value) && value !== "") {
-      setInputs({ ...inputs, comp_eff: parseFloat(value) / 100 });
-    }
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setLoading(true);
-    setError('');
-    setResults(null);
-    try {
-      const response = await axios.post('http://127.0.0.1:5000/calculate', inputs);
-      setResults(response.data);
-    } catch (err) {
-      setError('Error al calcular. Verifique los parámetros y que el servidor backend esté corriendo.');
-      console.error(err);
-    }
-    setLoading(false);
-  };
-
   return (
     <div className="App">
       <header className="App-header">
@@ -53,58 +64,56 @@ function App() {
       <main className="main-container">
         <div className="panel input-panel">
           <h2>Parámetros de Entrada</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Refrigerante:</label>
-              <select name="refrigerant" value={inputs.refrigerant} onChange={handleInputChange}>
-                <option value="R134a">R-134a</option>
-                <option value="R22">R-22</option>
-                <option value="R410A">R-410A</option>
-                <option value="R717">Amoniaco (R-717)</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Temp. Evaporación (°C):</label>
-              <input type="number" name="t_evap" value={inputs.t_evap} onChange={handleInputChange} />
-            </div>
-            <div className="form-group">
-              <label>Temp. Condensación (°C):</label>
-              <input type="number" name="t_cond" value={inputs.t_cond} onChange={handleInputChange} />
-            </div>
-            
-            <hr />
-            <h4>Parámetros del Ciclo Real</h4>
-            <div className="form-group">
-              <label>Sobrecalentamiento (°C):</label>
-              <input type="number" name="superheat" value={inputs.superheat} step="0.5" onChange={handleInputChange} />
-            </div>
-            <div className="form-group">
-              <label>Subenfriamiento (°C):</label>
-              <input type="number" name="subcooling" value={inputs.subcooling} step="0.5" onChange={handleInputChange} />
-            </div>
-            <div className="form-group">
-              <label>Eficiencia Compresor (%):</label>
-              <input type="number" name="comp_eff" value={inputs.comp_eff * 100} step="1" onChange={handleCompEffChange} />
-            </div>
+          {/* Ya no necesitamos el <form> ni el botón "Calcular" */}
+          <div className="form-group">
+            <label>Refrigerante:</label>
+            <select name="refrigerant" value={inputs.refrigerant} onChange={handleSelectChange}>
+              <option value="R134a">R-134a</option>
+              <option value="R22">R-22</option>
+              <option value="R410A">R-410A</option>
+              <option value="R717">Amoniaco (R-717)</option>
+            </select>
+          </div>
 
-            <button type="submit" disabled={loading}>
-              {loading ? 'Calculando...' : 'Calcular'}
-            </button>
-          </form>
+          <ParameterSlider label="Temp. Evaporación" unit="°C"
+            name="t_evap" value={inputs.t_evap} min={-40} max={10} step={0.5}
+            onChange={handleInputChange} />
+
+          <ParameterSlider label="Temp. Condensación" unit="°C"
+            name="t_cond" value={inputs.t_cond} min={20} max={60} step={0.5}
+            onChange={handleInputChange} />
+          
+          <hr />
+          <h4>Parámetros del Ciclo Real</h4>
+
+          <ParameterSlider label="Sobrecalentamiento" unit="°C"
+            name="superheat" value={inputs.superheat} min={0} max={20} step={0.5}
+            onChange={handleInputChange} />
+
+          <ParameterSlider label="Subenfriamiento" unit="°C"
+            name="subcooling" value={inputs.subcooling} min={0} max={15} step={0.5}
+            onChange={handleInputChange} />
+
+          <ParameterSlider label="Eficiencia Compresor" unit="%"
+            name="comp_eff" value={inputs.comp_eff * 100} min={50} max={100} step={1}
+            onChange={(e) => setInputs({...inputs, comp_eff: parseFloat(e.target.value) / 100})} />
+
         </div>
 
         <div className="panel diagram-panel">
           <h2>Diagrama P-h</h2>
-          <PhDiagram 
-            idealCycleData={results && results.ideal ? results.ideal.points : null}
-            realCycleData={results && results.real ? results.real.points : null}
-            domeData={results ? results.saturation_dome : null}
-          />
+          <div style={{ position: 'relative' }}>
+            {loading && <div className="loading-overlay">Calculando...</div>}
+            <PhDiagram 
+              idealCycleData={results && results.ideal ? results.ideal.points : null}
+              realCycleData={results && results.real ? results.real.points : null}
+              domeData={results ? results.saturation_dome : null}
+            />
+          </div>
         </div>
 
         <div className="panel results-panel">
           <h2>Resultados</h2>
-          {loading && <p>Calculando...</p>}
           {error && <p style={{ color: 'red' }}>{error}</p>}
           {results && results.ideal && results.real && (
             <div>
