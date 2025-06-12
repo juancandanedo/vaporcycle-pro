@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+.pnp
+.pnp.js
+coverage/
+build/
+
+# VSCode
+.vscode/
