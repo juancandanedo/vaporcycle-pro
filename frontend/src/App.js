@@ -8,6 +8,9 @@ function App() {
     refrigerant: 'R134a',
     t_evap: -10,
     t_cond: 40,
+    superheat: 5,
+    subcooling: 5,
+    comp_eff: 0.75,
   });
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
@@ -18,6 +21,13 @@ function App() {
       ...inputs,
       [event.target.name]: event.target.value,
     });
+  };
+  
+  const handleCompEffChange = (event) => {
+    const value = event.target.value;
+    if (!isNaN(value) && value !== "") {
+      setInputs({ ...inputs, comp_eff: parseFloat(value) / 100 });
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -61,6 +71,22 @@ function App() {
               <label>Temp. Condensación (°C):</label>
               <input type="number" name="t_cond" value={inputs.t_cond} onChange={handleInputChange} />
             </div>
+            
+            <hr />
+            <h4>Parámetros del Ciclo Real</h4>
+            <div className="form-group">
+              <label>Sobrecalentamiento (°C):</label>
+              <input type="number" name="superheat" value={inputs.superheat} step="0.5" onChange={handleInputChange} />
+            </div>
+            <div className="form-group">
+              <label>Subenfriamiento (°C):</label>
+              <input type="number" name="subcooling" value={inputs.subcooling} step="0.5" onChange={handleInputChange} />
+            </div>
+            <div className="form-group">
+              <label>Eficiencia Compresor (%):</label>
+              <input type="number" name="comp_eff" value={inputs.comp_eff * 100} step="1" onChange={handleCompEffChange} />
+            </div>
+
             <button type="submit" disabled={loading}>
               {loading ? 'Calculando...' : 'Calcular'}
             </button>
@@ -70,7 +96,8 @@ function App() {
         <div className="panel diagram-panel">
           <h2>Diagrama P-h</h2>
           <PhDiagram 
-            cycleData={results ? results.points : null} 
+            idealCycleData={results && results.ideal ? results.ideal.points : null}
+            realCycleData={results && results.real ? results.real.points : null}
             domeData={results ? results.saturation_dome : null}
           />
         </div>
@@ -79,11 +106,11 @@ function App() {
           <h2>Resultados</h2>
           {loading && <p>Calculando...</p>}
           {error && <p style={{ color: 'red' }}>{error}</p>}
-          {results && (
+          {results && results.ideal && results.real && (
             <div>
-              <h4>Rendimiento</h4>
-              <p><strong>COP:</strong> {results.performance.cop.toFixed(3)}</p>
-              {/* Aquí puedes añadir más resultados si quieres */}
+              <h4>Rendimiento Comparativo</h4>
+              <p><strong>COP (Ideal):</strong> {results.ideal.performance.cop.toFixed(3)}</p>
+              <p><strong>COP (Real):</strong> {results.real.performance.cop.toFixed(3)}</p>
             </div>
           )}
         </div>
